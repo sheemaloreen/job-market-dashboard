@@ -72,7 +72,7 @@ def fetch_adzuna(query="data analyst", country="gb", pages=1):
             response.raise_for_status()
             data = response.json()
         except requests.RequestException as e:
-            print(f"  Error fetching '{query}' ({country}) page {page}: {e}")
+            print(f"  Error fetching '{query}' ({country}) page {page} from Adzuna: {e}")
             continue
 
         for job in data.get("results", []):
@@ -150,6 +150,51 @@ def fetch_remoteok():
 
     return jobs
 
+# --- Remotive collection ---
+def fetch_remotive():
+    url = "https://remotive.com/api/remote-jobs"
+    headers = {"User-Agent": "Mozilla/5.0"}
+
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+    except requests.RequestException as e:
+        print(f"  Error fetching Remotive: {e}")
+        return []
+
+    jobs = []
+    for job in data.get("jobs", []):
+        title = job.get("title") or ""
+        description = job.get("description") or ""
+        search_text = f"{title} {description}".lower()
+
+        if not any(keyword in search_text for keyword in JOB_KEYWORDS):
+            continue
+
+        posted_date = None
+        raw_date = job.get("publication_date")
+        if raw_date:
+            try:
+                posted_date = datetime.fromisoformat(raw_date).strftime("%Y-%m-%d")
+            except ValueError:
+                posted_date = None
+
+        jobs.append({
+            "job_id": f"remotive_{job.get('id')}",
+            "title": title[:200],
+            "company": (job.get("company_name") or "")[:200],
+            "country": "remote",
+            "source": "remotive",
+            "url": (job.get("url") or "")[:500],
+            "salary_min": None,   # Remotive gives a free-text salary string, not min/max
+            "salary_max": None,
+            "posted_date": posted_date,
+            "description": description
+        })
+
+    return jobs
+
 
 # --- Run collection ---
 SEARCH_QUERIES = [
@@ -187,7 +232,11 @@ print("\nFetching RemoteOK jobs...")
 remoteok_jobs = fetch_remoteok()
 print(f"RemoteOK: {len(remoteok_jobs)} jobs")
 
-all_jobs = adzuna_jobs + remoteok_jobs
+print("\nFetching Remotive jobs...")
+remotive_jobs = fetch_remotive()
+print(f"Remotive: {len(remotive_jobs)} jobs")
+
+all_jobs = adzuna_jobs + remoteok_jobs + remotive_jobs
 print(f"\nTotal collected: {len(all_jobs)}")
 
 # --- Connect to Oracle ---
