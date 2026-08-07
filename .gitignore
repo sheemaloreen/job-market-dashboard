@@ -1,0 +1,9 @@
+
+.env
+oracle_wallet/
+wallet.zip
+wallet_base64.txt
+venv/
+__pycache__/
+*.pyc
+data/
